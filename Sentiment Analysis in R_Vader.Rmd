@@ -1,0 +1,334 @@
+---
+title: "Sentiment Analysis in R_Vader"
+author: "Daphne Castro Lingl"
+date: "2/15/2022"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+#INTRO TO SENTIMENT ANALYSIS 
+
+## What is sentiment analysis? 
+
+Sentiment analysis is a type of text analysis tool. Some synonyms of sentiment are feeling, attitude, opinion, emotion. Thus, in a sentiment analysis we are interested in the emotion or opinion of a word, sentence, paragraph, document, text, etc. 
+
+Specifically, **VADER**, the sentiment analysis tool we will be using today can pick up on **polarity**, that is whether a sentiment is *positive* or *negative*, and **intensity**, that is whether that sentiment is *strong* or *weak*. 
+
+*An example of polarity:* 
+
+I love this movie! vs I do not like this movie!
+--> positive          --> negative
+
+*An example of intensity:*
+
+I really love this movie!!! vs This is a sweet film. 
+--> strong                       --> weak
+
+A few things to note from the examples above: polarity and intensity can be inferred from...
+* The meaning of the word (e.g. love vs hate or like vs love)
+* Context of the words surrounding it (e.g. did *not* love, or *really really* loved)
+* Punctuation (e.g. I don't like this movie. vs I don't like this movie!)
+
+## What is sentiment analysis used for? 
+
+Sentiment analysis is often used by companies and brands to get an impression of how customers are feeling towards, for example, their brand or their services. That is, by analyzing discourse about the brand on social media or maybe even customer service responses. 
+
+**EXAMPLE: Uber Sentiment Analysis** 
+
+Uber conducted a sentiment analysis of tweets related to their business. (Note: this analysis was filtered for unrelated tweets such as, spam, junk, marketing, news, random, etc.)
+
+Tweet Category | Positive | Neutral | Negative
+-------------- | ------------------------------
+Cancel         | 27.36%   | 27.46%  | 45.18%
+Payment        | 27.07%   | 20.00%  | 52.93%
+Price          | 21.34%   | 29.88%  | 48.78%
+Safety         | 33.46%   | 26.56%  | 39.98%
+Service        | 21.36%   | 21.83%  | 56.81%
+
+--> What do you notice? What conclusions could uber draw from this data? How could it inform their behavior or plans as a company? 
+
+***
+
+## Sentiment Analysis in VADER 
+
+### Preliminaries
+
+You know the drill! Let's first clear out the workspace. 
+
+```{r clear-workspace}
+
+# clear the workspace (useful if we're not knitting)
+rm(list=ls())
+
+```
+
+Next we check for all required packages, and install them (if necessary) before loading them. 
+
+
+```{r function-check-for-packages, include=FALSE}
+
+# make sure we can load packages 
+# (thanks to https://gist.github.com/smithdanielle/9913897)
+load_or_install_packages <- function(pkg){
+  new.pkg <- pkg[!(pkg %in% installed.packages()[, "Package"])]
+  if (length(new.pkg)) {
+    install.packages(new.pkg, 
+                     dependencies = TRUE,
+                     repos="http://cloud.r-project.org/")}
+  sapply(pkg, require, character.only = TRUE) 
+}
+
+```
+
+
+```{r load-packages, message=FALSE, results="hide"}
+
+# specify which packages we'll need
+required_packages = c("vader",
+                      "stringr",
+                      "tidytext",
+                      "tm",
+                      "tidyverse",
+                      "Rcpp",
+                      "dplyr",
+                      "ggplot2")
+
+# install them (if necessary) and load them
+load_or_install_packages(required_packages)
+
+```
+
+Finally, we are also going to load in our dataset. Considering we are using vader I thought what could be more fitting than analyzing some Star Wars scripts! Since there are a ton of Star Wars Movies out there I decided that we are going to exclusively focus on the first movie (for the unitiated that refers to Star Wars Episodes IV). A very nice nerd before us was so kind to already create some star wars datasets for us and make them publicly available so that is what we are going to use today: (https://www.kaggle.com/xvivancos/star-wars-movie-scripts/version/2).
+
+```{r}
+
+eps4 <- read.table("SW_EpisodeIV.txt")
+
+head(eps4)
+
+```
+
+*Quick tip*: If there is an error message it might be that you have made and error setting up your working directory. To check your working directory type getwd() in your console. Use your current working directory as a guide to set your working directory correctly using the function setwd("path").
+
+***
+
+#### Intro to VADER. 
+
+There are two key functions we are interested in learning and understanding today. 
+
+* **get_vader()**
+  + This function allows us to run a sentiment analysis of a vector.
+* **vader_df()**
+  + This function allows us to run a sentiment analysis of a dataset.
+  
+While the two functions are able to run this analysis on different types of input their output still stays the same. That is, the output will tell you something about...
+
+* *word_scores*: that is the sentiment scores of the individual words you put in
+* *compound*: the overall sentiment score of the text you put in. 
+* *pos, neu, & neg*: The positive/neutral/negative sentiment of words in the text. 
+* *but_count*: Whether there are some buts in the text which could imply a switch of sentiment.
+
+***
+
+##### A) get_vader()
+
+Let's start with the get_vader() function. 
+
+Starting small let's open the stars wars dataset and look at the first line of dialogue of the movie. 
+
+```{r}
+
+head(eps4)
+
+```
+
+When you run this code you should see that line one of the movie is said by C3PO (THREEPIO): 
+
+"Did you hear that? They've shut down the main reactor. We'll be destroyed for sure. This is madness!". 
+
+Before we run the code, maybe ask yourself: What do you think is the sentiment of this line? Would you say it's either positive or negative? What about the intensity? Are there specific words, punctuation, etc. in this sentence that provide you more information about sentiment than others? 
+
+```{r}
+
+get_vader("Did you hear that? They've shut down the main reactor. We'll be destroyed for sure. This is madness!")
+
+```
+You should notice here that the overall sentiment of this line is negative. Unsurprisingly the words "destroyed" and "madness" were counted as individually having a negative sentiment. You should also notice that the word "sure" has been interpreted as having a positive sentiment. 
+
+**ACTIVITY 1**: 
+
+I want to make sure that you not only understand how to use get_vader but also how to interpret its output. So for the first activity, I want to focus on the measures of *Polarity* and *Intensity*. Basically, I want you to understand what parts of a text can affect the polarity and the intensity of its sentiment. Tip: If you are lost feel free to reference the Intro to Sentiment Analysis section of this R Markdown document.
+
+
+
+For this activity our starting off point is going to be the first line of the movie: 
+
+"Did you hear that? They've shut down the main reactor. We'll be destroyed for sure. This is madness!". 
+
+--> Remember this line had negative (polarity) sentiment, and the sentiment was relatively strong (intensity).
+
+
+Next I will tell you to achieve a certain change in compound sentiment, the polarity or intensity relative to this first line. You have two options on how to achieve this: 
+
+Option a) Find other lines in this script that fulfill the following requirements. 
+
+Option b) Alter the original line to fulfill the following requirements. 
+
+
+*Polarity*
+
+1. Find a line/or alter the original line to have a positive sentiment. 
+
+```{r}
+
+#original line for comparison
+get_vader("Did you hear that? They've shut down the main reactor. We'll be destroyed for sure. This is madness!")
+
+#input/alter your line here :) 
+get_vader("Did you hear that? They've shut down the main reactor. We'll be safe for sure. This is wonderful!")
+
+```
+
+2. Find a line/or alter the original line to have a more neutral sentiment (closer to 0)
+
+```{r}
+
+#original line for comparison
+get_vader("Did you hear that? They've shut down the main reactor. We'll be destroyed for sure. This is madness!")
+
+#input/alter your line here :) 
+get_vader("YOUR CODE HERE")
+
+```
+
+*Intensity*
+
+3. Find a line/or alter the original line to have a weaker sentiment. 
+
+```{r}
+
+#original line for comparison
+get_vader("Did you hear that? They've shut down the main reactor. We'll be destroyed for sure. This is madness!")
+
+#input/alter your line here :) 
+get_vader("Did you hear that? They've shut down the main reactor. We'll probably be scratched. This is silly.")
+
+```
+
+4. Find a line/or alter the original line to have a stronger sentiment. 
+
+```{r}
+
+#original line for comparison
+get_vader("Did you hear that? They've shut down the main reactor. We'll be destroyed for sure. This is madness!")
+
+#input/alter your line here :) 
+get_vader("YOUR CODE HERE")
+
+```
+
+*Optional: Intensity + Polarity + Switch*
+
+5. Find a line/or alter the original line to have a strong negative sentiment that that switches to a moderately positive sentiment. 
+
+```{r}
+
+#original line for comparison
+get_vader("Did you hear that? They've shut down the main reactor. We'll be destroyed for sure. This is madness!")
+
+#input/alter your line here :) 
+get_vader("YOUR CODE HERE")
+
+```
+
+***
+
+##### A) vader_df()
+
+At this point, I hope we all feel a lot more confident interpreting the output of a sentiment analysis through vader. So let's move on to using vader to anlyze the sentiment of a dataset. 
+
+Let's first start very broadly by analyzing the sentiments of the the dialogs in the entire first starwars film. Before we jump in let's quickly remind ourselves what this dataset looks like. 
+
+```{r}
+
+View(eps4)
+
+```
+
+You should notice here that our dataset has two variables, character and dialog, we are obviously interested in the dialogue of the film. R is on its own not smart enough to realize that so in our line of code we need to tell it that within the dataframe "eps4" we are interested in a sentiment analysis of the variable "dialogue". We do that with the help of $.  
+
+```{r}
+
+vader_df(eps4$dialogue)
+
+```
+Next in terms of the activities I thought it could be fun to do a sentiment analysis of different characters in the movie. Considering this program is called VADER I will be looking at Darth Vader's Dialog. 
+
+A way of doing this is to create a new dataset that consists out of a subset of the eps4 dataset, that being only the part that includes Darth Vader's dialog. Since R is really fussy about the spelling of variable names let's open up our dataset one more time and check what the variable that includes the character names is called again and how Darth Vader's character name is noted in the dataset. If it's still open you can just click on the other window that includes the dataset, otherwise the code to view the dataset can be found below. 
+
+```{r}
+
+View(eps4)
+
+```
+
+You should notice that the variable is called "character" and Darth Vader is noted as "VADER". So now with this information we can create the new dataset which I am going to call VaderData. 
+
+```{r}
+
+VaderData <- subset(eps4, eps4$character=="VADER")
+
+View(VaderData)
+
+```
+
+Now let's run a sentiment analysis on this dataset, using vader_df()
+
+```{r}
+
+vader_df(VaderData$dialogue)
+
+```
+Something interesting to note here is that if we go to the compound of Vaders lines we can see that a lot of his lines have a negative sentiment, which maybe makes sense considering he is the story's villain. 
+
+**ACTIVITY 2**:
+
+For the second activity, I want you to pick out another character in this dataset, create a new subset that includes only dialogue of this character and conduct a sentiment analysis on this characters dialogue. Interesting things to ask yourself: What overall sentiment do this character's lines have? If you don't know star wars: do you think the character is a villain or hero of the story? Do we see some changes in sentiment? Is the sentiment strong? How does it compare to Darth Vader's sentiment? I know with this type of analyses we cannot conclusively answer these questions but the output might at least give us an impression. 
+
+If you know the films just pick your character favorite character! If you don't, the code below will give you the top 10 characters with the highest count of scenes in Episode 4 (Shout out to this lady that created code like this in a star wars analysis she herself conducted: https://github.com/SaraKmair/StarWars). Just choose one of those and run your analysis based on it!
+
+```{r}
+#The top ten character with highest count of scenes in episode 4 
+top10 <- eps4 %>%
+group_by(character) %>%
+  summarise(freq = n()) %>% 
+  arrange(desc(freq)) %>% 
+  slice(1:10)  #order the first 10 in descinding order 
+  ggplot(top10, aes(reorder(character, +freq), y = freq)) +
+  geom_col(fill = "goldenrod2" , col = "grey20") +
+    coord_flip() +
+    labs(x = "", y = "Frequency", title = "Top 10 characters") 
+    
+```
+Character you chose: _____
+
+Expectations?: _____
+
+Creation of the new dataset: 
+```{r}
+
+#Put your own code here!
+
+```
+
+Sentiment analysis using vader_df()
+```{r}
+
+#Put your own code here!
+
+```
+
+
+
+
